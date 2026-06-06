@@ -176,6 +176,32 @@ def parse_step(text: str) -> Step:
     return step
 
 
+def _clean_obs(observation: str) -> str:
+    """Strip the loop-guard NOTE suffix from an observation."""
+    idx = observation.find(" (NOTE:")
+    return observation[:idx] if idx != -1 else observation
+
+
+def _fallback_answer_from_trace(steps: list[Step], k: int = 3) -> str:
+    """Build a grounded answer from the last successful tool observations.
+
+    Used when the model fails to articulate a clean Final Answer; presenting the
+    actual tool outputs keeps the answer grounded instead of hallucinated.
+    """
+    seen: list[str] = []
+    for s in steps:
+        if not s.observation:
+            continue
+        obs = _clean_obs(s.observation).strip()
+        if obs.startswith("ERROR") or not obs:
+            continue
+        if obs not in seen:
+            seen.append(obs)
+    if not seen:
+        return ""
+    return "Based on the tool results: " + "; ".join(seen[-k:])
+
+
 def _build_scratchpad(steps: list[Step]) -> str:
     """Render prior steps back into the ReAct transcript for the next prompt."""
     parts: list[str] = []
@@ -284,11 +310,27 @@ def run_agent(
         + "\n\n"
         + scratchpad
         + "\n\nYou must stop now and answer using ONLY the Observations above. "
-        "Do not call any more tools. Reply with a single line:\nFinal Answer:"
+        "Do not call any more tools. Copy any numbers EXACTLY as they appear in the "
+        "Observations — do not recompute, round, or change any digits. If the "
+        "question asks for two quantities, include both. Reply with a single line:"
+        "\nFinal Answer:"
     )
     raw = llm.chat(system=system, user=user)
-    forced = parse_step("Final Answer:" + raw if "final answer" not in raw.lower() else raw)
-    result.final_answer = forced.final_answer or raw.strip()
+    forced = parse_step(raw if "final answer:" in raw.lower() else "Final Answer:" + raw)
+    answer = (forced.final_answer or "").strip()
+
+    # Reject empty / scaffolding-only / number-less synthesis and fall back to
+    # the actual grounded tool outputs (our queries are all numeric).
+    if (
+        not answer
+        or answer.lower().startswith(("thought", "action"))
+        or not re.search(r"\d", answer)
+    ):
+        fallback = _fallback_answer_from_trace(result.steps)
+        answer = fallback or answer or raw.strip()
+
+    result.final_answer = answer
+    forced.final_answer = answer
     result.steps.append(forced)
     if logger:
         logger(f"  -> synthesized Final Answer: {result.final_answer}")

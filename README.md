@@ -44,8 +44,11 @@ RUN_REPORT.md      # auto-generated narrative of the latest run
 
 ```bash
 # Install Ollama from https://ollama.com/download, then:
-ollama pull llama3.2:1b      # ~1.3 GB; default model used here
+ollama pull llama3.2:3b      # ~2 GB; default model (follows ReAct reliably)
 ollama serve                  # usually already running on :11434
+
+# Optional lighter fallback (lower quality, triggers more self-corrections):
+# ollama pull llama3.2:1b   and run with  ZEN_MODEL=llama3.2:1b python3 run.py
 ```
 
 No `pip install` is required — the project uses only the Python standard library.
@@ -74,9 +77,27 @@ ZEN_MODEL=llama3.2:3b OLLAMA_HOST=http://localhost:11434 python3 run.py
 | Medium    | Germany pop − France pop | `knowledge_lookup` ×2, `calculator` |
 | Complex   | (FR+DE) × 2 L/day → gallons | `knowledge_lookup` ×3, `calculator`, `unit_converter` |
 
-## Notes on the model
+## Robustness mechanisms
 
-`llama3.2:1b` is tiny and will occasionally produce malformed steps or sloppy
-arithmetic. That is intentional for this exercise: it exercises the error
-handling and self-correction paths. The deterministic verifier guarantees
-arithmetic mistakes are caught even when the verifier model misses them.
+Small local models drift from the ReAct format, repeat calls, and occasionally
+mangle digits when writing the final answer. The agent defends against this:
+
+- **Stop token + format nudges.** `Observation:` is a stop token so the model
+  can't hallucinate tool output; malformed turns are fed back with a format
+  reminder.
+- **Loop guard.** Identical repeated tool calls are flagged, and after three
+  repeats the loop breaks and synthesizes an answer.
+- **Grounded fallback.** If the model can't articulate a clean `Final Answer`,
+  the agent answers directly from the actual tool observations (never an
+  invented number).
+- **Deterministic verifier.** Independent of the (fallible) verifier LLM, it
+  re-evaluates every calculator expression and flags any number in the final
+  answer that no tool produced — this is what catches hallucinated/transposed
+  digits.
+- **Best-attempt selection.** Across the initial answer and any corrections, the
+  highest-scoring (deterministically clean, verifier-approved, numeric) answer
+  is chosen, so a bad re-run can never replace a good answer.
+
+`llama3.2:1b` also works as a fallback but produces messier traces and more
+frequent (sometimes spurious) self-corrections — useful for stress-testing the
+error-handling paths.

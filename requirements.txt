@@ -3,8 +3,11 @@
 #
 # External requirement: a running Ollama server with a chat model pulled.
 #   1. Install Ollama:  https://ollama.com/download
-#   2. Pull the model:  ollama pull llama3.2:1b
+#   2. Pull the model:  ollama pull llama3.2:3b   (default; follows ReAct well)
 #   3. Ensure it serves at http://localhost:11434 (default).
 #
+# A lighter fallback (lower quality, more self-corrections) also works:
+#   ollama pull llama3.2:1b
+#
 # Override the model or host with environment variables if needed:
-#   ZEN_MODEL=llama3.2:3b OLLAMA_HOST=http://localhost:11434 python3 run.py
+#   ZEN_MODEL=llama3.2:1b OLLAMA_HOST=http://localhost:11434 python3 run.py

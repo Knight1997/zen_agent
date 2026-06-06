@@ -16,7 +16,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
-DEFAULT_MODEL = os.environ.get("ZEN_MODEL", "llama3.2:1b")
+DEFAULT_MODEL = os.environ.get("ZEN_MODEL", "llama3.2:3b")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 

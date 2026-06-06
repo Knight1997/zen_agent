@@ -53,13 +53,16 @@ def _attempt_score(attempt: Attempt) -> float:
     answer beats a flagged one, so a bad rerun can never replace a good answer.
     """
     v = attempt.verification
-    score = 0.0
+    answer = attempt.result.final_answer or ""
+    # Our queries are numeric; an answer with no number is not useful, so it
+    # can never out-score a real numeric answer.
+    if not _NUM.search(answer):
+        return 0.0
+    score = 1.0  # produced a concrete numeric answer
     if not v.deterministic_notes:
         score += 100.0  # no arithmetic / grounding violations found
     if v.is_correct:
         score += 10.0  # the separate LLM verifier approved it
-    if attempt.result.final_answer and _NUM.search(attempt.result.final_answer):
-        score += 1.0  # produced a concrete numeric answer
     return score
 
 

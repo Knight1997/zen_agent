@@ -23,12 +23,17 @@ you only check someone else's work. Given a question, the step-by-step trace, an
 judge whether the final answer is correct.
 
 Check three things:
-1. Arithmetic: are all calculations correct?
-2. Logical consistency: do the steps actually answer the question?
-3. Source grounding: are all facts/numbers backed by a tool observation (knowledge_lookup / calculator), not invented?
+1. Arithmetic: trust the `calculator` Observations — they are always arithmetically correct, \
+so NEVER claim a calculator Observation's result is wrong. Only flag arithmetic if a number in \
+the Final Answer was never produced by a calculator Observation.
+2. Logical consistency: do the steps actually answer the question that was asked?
+3. Source grounding: is every fact/number in the Final Answer backed by an Observation \
+(knowledge_lookup or calculator), and copied exactly (no altered digits)?
+
+If the Final Answer's numbers all match the tool Observations and answer the question, say CORRECT.
 
 Respond with ONLY a JSON object on a single line, no prose:
-{"verdict": "CORRECT" or "INCORRECT", "issues": ["..."], "guidance": "concrete instruction for a retry, or empty string if correct"}"""
+{"verdict": "CORRECT" or "INCORRECT", "issues": ["short issue", ...], "guidance": "concrete fix instruction, or empty string if correct"}"""
 
 
 @dataclass

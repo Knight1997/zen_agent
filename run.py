@@ -96,6 +96,19 @@ def generate_report(results: list[tuple[dict, SolveOutcome]], model: str, elapse
         "triggered."
     )
     out.append("")
+    out.append(
+        "**How to read the verdicts:** each answer is checked by two independent "
+        "verifiers — (1) a *separate LLM call* that judges arithmetic, logical "
+        "consistency, and source grounding, and (2) a *deterministic* checker that "
+        "re-evaluates every calculator expression and flags any number in the final "
+        "answer that no tool produced. The small LLM verifier is noisy and often "
+        "raises spurious `INCORRECT` verdicts, so the deterministic checker is "
+        "authoritative for arithmetic/grounding. Across the initial answer and any "
+        "re-runs, a **best-attempt selector** keeps the highest-scoring (grounded, "
+        "numeric) answer — which is why a query can show `INCORRECT` verdicts yet "
+        "still surface a correct final answer."
+    )
+    out.append("")
 
     # Summary table.
     out.append("## Summary")
@@ -174,9 +187,13 @@ def generate_report(results: list[tuple[dict, SolveOutcome]], model: str, elapse
                     f"{accepted.result.final_answer}"
                 )
                 out.append(f"  - Verifier verdict: `{accepted.verification.verdict}`")
+                det = accepted.verification.deterministic_notes
                 out.append(
-                    "  - The re-run scored higher (deterministically clean / "
-                    "verifier-approved), so it replaced the initial answer."
+                    "  - The re-run scored higher — its answer is "
+                    + ("deterministically clean (every number is grounded in a tool "
+                       "observation, no arithmetic errors)" if not det
+                       else "preferred by the scorer")
+                    + ", so it replaced the initial (ungrounded) answer."
                 )
             else:
                 out.append(
@@ -208,7 +225,7 @@ def main() -> int:
         logger = make_logger(buffer)
         try:
             outcome = solve(
-                query["question"], llm, max_corrections=1, max_steps=6, logger=logger
+                query["question"], llm, max_corrections=1, max_steps=8, logger=logger
             )
         except LLMError as exc:
             print(f"\nFATAL: {exc}", file=sys.stderr)
